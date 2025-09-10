@@ -10,6 +10,12 @@ for col in ["opened_at", "resolved_at"]:
     if col in df.columns:
         df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
 
-#Variable dependiente: tiempo de resolución en horas 
-df["tiempo_resolver_horas"] = (df["resolved_at"] - df["opened_at"]).dt.total_seconds() / 3600.0
+#tiempo de resolución en horas 
+df["tiempo_resolver_horas"] = (df["resolved_at"] - df["opened_at"]).dt.total_seconds() / 3600
 
+#variables de interés
+cols_interes = ["tiempo_resolver_horas", "reassignment_count",
+    "reopen_count", "impact", "urgency", "priority",]
+
+#Creacion de nuevo dataframe
+df_interes = df[cols_interes].copy()
