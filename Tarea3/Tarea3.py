@@ -22,9 +22,29 @@ df_interes = df[cols_interes].copy()
 
 #Filtrado de registros invalidos
 df_interes = df_interes.dropna(subset=["tiempo_resolver_horas"])
-df_ej1 = df_interes[df_interes["tiempo_resolver_horas"] >= 0]
+df_interes = df_interes[df_interes["tiempo_resolver_horas"] >= 0]
 
 #Recortar espacios en categóricas si existiesen
 for col in ["impact", "urgency", "priority"]:
-    if col in df_ej1.columns and pd.api.types.is_object_dtype(df_ej1[col]):
-        df_ej1[col] = df_ej1[col].astype(str).str.strip()
+    if col in df_interes.columns and pd.api.types.is_object_dtype(df_interes[col]):
+        df_interes[col] = df_interes[col].astype(str).str.strip()
+
+#No borrar filas con 0s
+for col in ["reassignment_count", "reopen_count"]:
+    if col in df_interes.columns:
+        df_interes[col] = pd.to_numeric(df_interes[col], errors="coerce").fillna(0)
+        df_interes[col] = df_interes[col].clip(lower=0).astype(int)
+
+import re
+#extraer valor ordinal de atributos categóricos
+def extraer_ordinal(s):
+    if pd.isna(s):
+        return pd.NA
+    m = re.match(r"\s*(\d+)", str(s))
+    return int(m.group(1)) if m else pd.NA
+
+for col in ["impact", "urgency", "priority"]:
+    if col in df_interes.columns:
+        df_interes[col + "_n"] = df_interes[col].apply(extraer_ordinal)
+
+print(df) 
