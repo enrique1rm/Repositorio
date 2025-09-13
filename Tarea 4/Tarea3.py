@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 
 # --- Configuración ---
-df = pd.read_csv('incident_event_log.csv')
+df = pd.read_csv('../incident_event_log.csv', low_memory=False)
 print (df.head())
 
 #Conversión de fechas 
@@ -48,5 +48,14 @@ for col in ["impact", "urgency", "priority"]:
         df_interes[col + "_n"] = df_interes[col].apply(extraer_ordinal)
 
 print(df) 
+
+import os
+os.makedirs("tarea5/data", exist_ok=True)
+
+df_interes.to_csv("tarea5/data/incidentes_limpio.csv", index=False)
+
+print("OK -> tarea5/data/incidentes_limpio.csv")
+
+
 
 
