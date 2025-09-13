@@ -1,7 +1,7 @@
 import pandas as pd
 import Tarea3
 
-from Tarea3 import df_interes
+
 
 import pandas as pd
 import numpy as np
