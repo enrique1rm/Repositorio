@@ -1,7 +1,9 @@
 import pandas as pd
 import Tarea3
 
-from Tarea3 import df_interes
+from Tarea3 import load_data
+df = load_data()
+
 
 import pandas as pd
 import numpy as np
