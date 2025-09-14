@@ -1,14 +1,34 @@
 import pandas as pd
 import numpy as np
+from pathlib import Path
 
-<<<<<<< HEAD
-#Carga de datos
-df = pd.read_csv('incident_event_log.csv')
-=======
-# --- Configuración ---
-df = pd.read_csv('../incident_event_log.csv', low_memory=False)
->>>>>>> 284e8aec98f5df77bee36149cf45bb6c9ef18415
-print (df.head())
+# ========== Carga de datos con ruta robusta ==========
+THIS_DIR = Path(__file__).resolve().parent        # .../Repositorio-1/Tarea 4
+REPO_DIR = THIS_DIR.parent                        # .../Repositorio-1
+
+# Candidatos donde podría estar el CSV
+candidates = [
+    THIS_DIR / "incident_event_log.csv",
+    REPO_DIR / "incident_event_log.csv",
+]
+
+DATA_PATH = None
+for p in candidates:
+    if p.exists():
+        DATA_PATH = p
+        break
+
+if DATA_PATH is None:
+    raise FileNotFoundError(
+        f"No encontré 'incident_event_log.csv' en: {candidates}. "
+        "Colócalo en la raíz del repo o en 'Tarea 4'."
+    )
+
+print(">> DATA_PATH:", DATA_PATH)
+df = pd.read_csv(DATA_PATH, low_memory=False)
+print(df.head())
+# ========== fin carga ==========
+
 
 # 1) Normalizar strings (recortar) en columnas object
 obj_cols = df.select_dtypes(include=["object"]).columns.tolist()
@@ -76,7 +96,6 @@ for c in bool_cols:
 num_cols = df_closed.select_dtypes(include=[np.number]).columns.tolist()
 df_closed[num_cols] = df_closed[num_cols].fillna(0)
 
-<<<<<<< HEAD
 # 8) Eliminar columnas constantes (sin información)
 const_cols = []
 for c in df_closed.columns:
@@ -85,20 +104,47 @@ for c in df_closed.columns:
         const_cols.append(c)
 if len(const_cols) > 0:
     df_closed = df_closed.drop(columns=const_cols, errors="ignore")
-=======
+
+#PARA TAREA 5
 import os
+import re
+
+# 1) Tomar df_closed como base
+base_df = df_closed.copy()
+
+# 2) Asegurar que el target se llame 'tiempo_resolucion_horas'
+if "tiempo_resolucion_horas" not in base_df.columns and "tiempo_resolver_horas" in base_df.columns:
+    base_df.rename(columns={"tiempo_resolver_horas": "tiempo_resolucion_horas"}, inplace=True)
+
+# 3) (Opcional) crear ordinales numéricos si faltan
+def first_int(x):
+    if pd.isna(x): 
+        return np.nan
+    m = re.match(r"\s*(\d+)", str(x))
+    return float(m.group(1)) if m else np.nan
+
+for c in ["impact", "urgency", "priority"]:
+    if c in base_df.columns and (c + "_n") not in base_df.columns:
+        base_df[c + "_n"] = base_df[c].apply(first_int)
+
+# 4) Asegurar tipo fecha para filtros en el tablero
+for c in ["opened_at", "resolved_at", "closed_at", "sys_updated_at"]:
+    if c in base_df.columns:
+        base_df[c] = pd.to_datetime(base_df[c], errors="coerce")
+
+# 5) Guardar TODO df_closed (deberían salir 38 columnas)
 os.makedirs("tarea5/data", exist_ok=True)
+out_path = "tarea5/data/incidentes_limpio.csv"
+base_df.to_csv(out_path, index=False)
 
-df_interes.to_csv("tarea5/data/incidentes_limpio.csv", index=False)
+print("OK ->", out_path, "| shape =", base_df.shape)
+print("Tiene claves:", {k: (k in base_df.columns) for k in
+      ["opened_at","assignment_group","category","made_sla","tiempo_resolucion_horas"]})
 
-print("OK -> tarea5/data/incidentes_limpio.csv")
 
 
+#print(df_closed)
+#print(df)
 
->>>>>>> 284e8aec98f5df77bee36149cf45bb6c9ef18415
-
-print(df_closed)
-print(df)
-
-def load_data():
-    return df_closed
+#def load_data():
+#    return df_closed

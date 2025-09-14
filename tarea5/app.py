@@ -1,73 +1,52 @@
-
-import os, re
 import pandas as pd
 import numpy as np
-
-import dash
-from dash import dcc, html, Input, Output, State
 import plotly.express as px
-
-import joblib
-from sklearn.linear_model import LinearRegression
-
-
 from pathlib import Path
+
+from dash import Dash, dcc, html, Input, Output
+
+# ====== RUTA AL CSV EXPORTADO DESDE df_closed ======
+# Opción A (recomendada): pathlib con ruta relativa robusta
 APP_DIR  = Path(__file__).resolve().parent
 REPO_DIR = APP_DIR.parent
+DATA_PATH = REPO_DIR / "Tarea 4" / "tarea5" / "data" / "incidentes_limpio.csv"
 
-DATA_PATH  = REPO_DIR / "Tarea 4" / "tarea5" / "data" / "incidentes_limpio.csv"
-MODEL_PATH = APP_DIR / "models" / "modelo_resolucion.pkl"
 
 print(">> DATA_PATH:", DATA_PATH)
-df = pd.read_csv(DATA_PATH)
-print(">> CSV cargado. Filas:", len(df), "Columnas:", len(df.columns))
-print(">> Columnas:", list(df.columns))
- 
-df = pd.read_csv(DATA_PATH)
-print(">> CSV cargado. Filas:", len(df), "Columnas:", len(df.columns))
-for c in ["opened_at","resolved_at","closed_at","sys_updated_at"]:
-    if c in df.columns:
-        df[c] = pd.to_datetime(df[c], errors="coerce")
 
-def first_int(x):
-    if pd.isna(x): return np.nan
-    m = re.match(r"\s*(\d+)", str(x))
-    return int(m.group(1)) if m else np.nan
-
-for c in ["impact","urgency","priority"]:
-    if c in df.columns and c+"_n" not in df.columns:
-        df[c+"_n"] = df[c].apply(first_int)
+parse_cols = ["opened_at", "resolved_at", "closed_at", "sys_updated_at"]
+df = pd.read_csv(DATA_PATH, low_memory=False, parse_dates=[c for c in parse_cols if c in pd.read_csv(DATA_PATH, nrows=0).columns])
 
 if "opened_at" in df.columns:
-    if "opened_hour" not in df.columns:
-        df["opened_hour"] = df["opened_at"].dt.hour
-    if "opened_wday" not in df.columns:
-        df["opened_wday"] = df["opened_at"].dt.dayofweek
-    if "opened_month" not in df.columns:
-        df["opened_month"] = df["opened_at"].dt.month
+    df["opened_at"] = pd.to_datetime(df["opened_at"], errors="coerce", dayfirst=True)
 
+if "made_sla" in df.columns:
+ 
+    df["made_sla"] = pd.to_numeric(df["made_sla"], errors="coerce")
+
+for col in ["assignment_group", "category"]:
+    if col in df.columns:
+        df[col] = df[col].astype(str).str.strip()
+
+
+print(">> CSV cargado. Filas:", len(df), "Columnas:", len(df.columns))
+
+# ====== OPCIONES PARA FILTROS ======
 min_date = df["opened_at"].min() if "opened_at" in df.columns else None
 max_date = df["opened_at"].max() if "opened_at" in df.columns else None
 
-groups = sorted(df["assignment_group"].dropna().unique()) if "assignment_group" in df.columns else []
-cats   = sorted(df["category"].dropna().unique()) if "category" in df.columns else []
+groups = sorted(df["assignment_group"].dropna().unique().tolist()) if "assignment_group" in df.columns else []
+cats   = sorted(df["category"].dropna().unique().tolist()) if "category" in df.columns else []
 
-baseline_model = None
-feat_cols = [c for c in ["impact_n","urgency_n","priority_n","reassignment_count","reopen_count","opened_hour","opened_wday","opened_month"] if c in df.columns]
+# ====== APP ======
+app = Dash(__name__)
+app.title = "Tablero de Incidentes — Gerente de TI"
 
-if os.path.exists(MODEL_PATH):
-    try:
-        baseline_model = joblib.load(MODEL_PATH)
-    except Exception:
-        baseline_model = None
-
-if baseline_model is None and "tiempo_resolucion_horas" in df.columns and len(feat_cols) > 0 and len(df) > 50:
-    X = df[feat_cols].fillna(0)
-    y = df["tiempo_resolucion_horas"].values
-    baseline_model = LinearRegression().fit(X, y)
-
-app = dash.Dash(__name__)
-server = app.server
+def kpi_card(id_, title):
+    return html.Div([
+        html.H4(title),
+        html.Div("—", id=id_, style={"fontSize":"1.4rem", "fontWeight":"bold"})
+    ], style={"padding":"10px", "border":"1px solid #eee", "borderRadius":"12px", "boxShadow":"0 1px 4px rgba(0,0,0,.05)"})
 
 app.layout = html.Div([
     html.H2("Tablero de Incidentes — Gerente de TI"),
@@ -80,88 +59,41 @@ app.layout = html.Div([
                 min_date_allowed=min_date, max_date_allowed=max_date,
                 start_date=min_date, end_date=max_date
             )
-        ], style={"marginRight":"16px"}),
+        ], style={"width":"32%"}),
 
         html.Div([
             html.Label("Assignment group"),
-            dcc.Dropdown(id="f-group",
-                         options=[{"label": g, "value": g} for g in groups],
-                         multi=True, placeholder="Todos")
-        ], style={"width":"320px","marginRight":"16px"}),
+            dcc.Dropdown(options=[{"label":g, "value":g} for g in groups],
+                         value=[], multi=True, placeholder="Todos",
+                         id="f-group")
+        ], style={"width":"32%"}),
 
         html.Div([
             html.Label("Category"),
-            dcc.Dropdown(id="f-cat",
-                         options=[{"label": c, "value": c} for c in cats],
-                         multi=True, placeholder="Todas")
-        ], style={"width":"320px"})
-    ], style={"display":"flex","flexWrap":"wrap","alignItems":"end","marginBottom":"12px"}),
+            dcc.Dropdown(options=[{"label":c, "value":c} for c in cats],
+                         value=[], multi=True, placeholder="Todas",
+                         id="f-cat")
+        ], style={"width":"32%"})
+    ], style={"display":"flex", "gap":"2%", "marginBottom":"14px"}),
 
     html.Div([
-        html.Div(id="kpi-mttr",  className="kpi"),
-        html.Div(id="kpi-sla",   className="kpi"),
-        html.Div(id="kpi-vol",   className="kpi"),
-        html.Div(id="kpi-crit",  className="kpi"),
-    ], style={"display":"grid","gridTemplateColumns":"repeat(4,1fr)","gap":"12px","marginBottom":"12px"}),
+        kpi_card("kpi-mttr", "MTTR (h)"),
+        kpi_card("kpi-sla", "% SLA cumplidos"),
+        kpi_card("kpi-vol", "Volumen"),
+        kpi_card("kpi-crit", "% críticos (impact=1)")
+    ], style={"display":"grid", "gridTemplateColumns":"repeat(4, 1fr)", "gap":"12px", "marginBottom":"14px"}),
 
     html.Div([
         dcc.Graph(id="g-box-impact"),
-        dcc.Graph(id="g-bar-group"),
-        dcc.Graph(id="g-scatter-reassign"),
-    ], style={"display":"grid","gridTemplateColumns":"repeat(2,1fr)","gap":"12px"}),
+        dcc.Graph(id="g-bar-group")
+    ], style={"display":"grid", "gridTemplateColumns":"1fr 1fr", "gap":"12px"}),
 
-    html.Hr(),
-
-    html.H3("Predicción de tiempo de resolución"),
     html.Div([
-        html.Div([
-            html.Label("Impact (1=alto, 2=medio, 3=bajo)"),
-            dcc.Dropdown(id="p-impact",
-                         options=[{"label": str(v), "value": v} for v in sorted(df["impact_n"].dropna().unique())] if "impact_n" in df.columns else [],
-                         placeholder="Selecciona…"),
-        ], style={"width":"220px","marginRight":"12px"}),
+        dcc.Graph(id="g-scatter-reassign")
+    ]),
+], style={"maxWidth":"1200px", "margin":"20px auto", "fontFamily":"sans-serif"})
 
-        html.Div([
-            html.Label("Urgency (1,2,3)"),
-            dcc.Dropdown(id="p-urgency",
-                         options=[{"label": str(v), "value": v} for v in sorted(df["urgency_n"].dropna().unique())] if "urgency_n" in df.columns else [],
-                         placeholder="Selecciona…"),
-        ], style={"width":"220px","marginRight":"12px"}),
-
-        html.Div([
-            html.Label("Priority (1..n)"),
-            dcc.Dropdown(id="p-priority",
-                         options=[{"label": str(v), "value": v} for v in sorted(df["priority_n"].dropna().unique())] if "priority_n" in df.columns else [],
-                         placeholder="Selecciona…"),
-        ], style={"width":"220px","marginRight":"12px"}),
-
-        html.Div([
-            html.Label("Reassignment count"),
-            dcc.Input(id="p-reassign", type="number", value=0, min=0, step=1),
-        ], style={"width":"220px","marginRight":"12px"}),
-
-        html.Div([
-            html.Label("Reopen count"),
-            dcc.Input(id="p-reopen", type="number", value=0, min=0, step=1),
-        ], style={"width":"220px","marginRight":"12px"}),
-
-        html.Button("Predecir", id="p-btn", n_clicks=0)
-    ], style={"display":"flex","flexWrap":"wrap","alignItems":"end","gap":"8px"}),
-
-    html.Div(id="p-out", style={"marginTop":"12px","fontWeight":"bold"})
-], style={"padding":"16px"})
-
-def filtrar(df0, start_date, end_date, groups, cats):
-    dff = df0.copy()
-    if "opened_at" in dff.columns:
-        if start_date: dff = dff[dff["opened_at"] >= pd.to_datetime(start_date)]
-        if end_date:   dff = dff[dff["opened_at"] <= pd.to_datetime(end_date)]
-    if "assignment_group" in dff.columns and groups:
-        dff = dff[dff["assignment_group"].isin(groups)]
-    if "category" in dff.columns and cats:
-        dff = dff[dff["category"].isin(cats)]
-    return dff
-
+# ====== CALLBACK ======
 @app.callback(
     [Output("kpi-mttr","children"),
      Output("kpi-sla","children"),
@@ -173,69 +105,73 @@ def filtrar(df0, start_date, end_date, groups, cats):
     [Input("f-fechas","start_date"), Input("f-fechas","end_date"),
      Input("f-group","value"), Input("f-cat","value")]
 )
-def actualizar(start_date, end_date, groups, cats):
-    dff = filtrar(df, start_date, end_date, groups, cats)
+def actualizar(start_date, end_date, groups_sel, cats_sel):
+    try:
+        dff = df.copy()
 
-    mttr = dff["tiempo_resolucion_horas"].mean() if "tiempo_resolucion_horas" in dff.columns else np.nan
-    kpi_mttr = f"MTTR: {mttr:.2f} h" if pd.notna(mttr) else "MTTR: n/d"
+        # Filtros
+        if "opened_at" in dff.columns:
+            if start_date: dff = dff[dff["opened_at"] >= pd.to_datetime(start_date)]
+            if end_date:   dff = dff[dff["opened_at"] <= pd.to_datetime(end_date)]
+        if "assignment_group" in dff.columns and groups_sel:
+            dff = dff[dff["assignment_group"].isin(groups_sel)]
+        if "category" in dff.columns and cats_sel:
+            dff = dff[dff["category"].isin(cats_sel)]
 
-    if "made_sla" in dff.columns and len(dff)>0:
-        sla = dff["made_sla"].mean()*100
-        kpi_sla = f"% SLA cumplidos: {sla:.1f}%"
-    else:
-        kpi_sla = "% SLA cumplidos: n/d"
+        # KPIs
+        if "tiempo_resolucion_horas" in dff.columns and len(dff):
+            mttr = dff["tiempo_resolucion_horas"].mean()
+            kpi_mttr = f"{mttr:.2f} h"
+        else:
+            kpi_mttr = "n/d"
 
-    kpi_vol = f"Volumen: {len(dff)}"
+        if "made_sla" in dff.columns and len(dff):
+            sla = dff["made_sla"].mean() * 100
+            kpi_sla = f"{sla:.1f}%"
+        else:
+            kpi_sla = "n/d"
 
-    crit = (dff["impact_n"].eq(1).mean()*100) if "impact_n" in dff.columns and len(dff)>0 else np.nan
-    kpi_crit = f"% críticos: {crit:.1f}%" if pd.notna(crit) else "% críticos: n/d"
+        kpi_vol = f"{len(dff)}"
 
-    fig1 = px.box(dff, x="impact", y="tiempo_resolucion_horas", title="Tiempo por Impact")
-    if "assignment_group" in dff.columns:
-        tmp = dff.groupby("assignment_group", as_index=False)["tiempo_resolucion_horas"].mean().sort_values("tiempo_resolucion_horas", ascending=False).head(20)
-        fig2 = px.bar(tmp, x="assignment_group", y="tiempo_resolucion_horas", title="Tiempo promedio por grupo")
-    else:
-        fig2 = px.bar(title="Tiempo promedio por grupo (columna no disponible)")
+        crit = None
+        if "impact_n" in dff.columns and len(dff):
+            crit = (dff["impact_n"] == 1).mean() * 100
+        elif "impact" in dff.columns and len(dff):
+            # Heurística si impact viene como texto tipo "1 - High"
+            crit = dff["impact"].astype(str).str.startswith("1").mean() * 100
+        kpi_crit = f"{crit:.1f}%" if crit is not None else "n/d"
 
-    if "reassignment_count" in dff.columns:
-        fig3 = px.scatter(dff, x="reassignment_count", y="tiempo_resolucion_horas",
-                          title="Reasignaciones vs Tiempo de resolución", trendline="ols")
-    else:
-        fig3 = px.scatter(title="Reasignaciones vs Tiempo (columna no disponible)")
+        # Figuras
+        if {"impact","tiempo_resolucion_horas"}.issubset(dff.columns):
+            fig1 = px.box(dff, x="impact", y="tiempo_resolucion_horas", title="Tiempo por Impact")
+        else:
+            fig1 = px.box(title="Tiempo por Impact (n/d)")
 
-    return kpi_mttr, kpi_sla, kpi_vol, kpi_crit, fig1, fig2, fig3
+        if {"assignment_group","tiempo_resolucion_horas"}.issubset(dff.columns) and len(dff):
+            tmp = (dff
+                   .groupby("assignment_group", as_index=False)["tiempo_resolucion_horas"]
+                   .mean()
+                   .sort_values("tiempo_resolucion_horas", ascending=False)
+                   .head(20))
+            fig2 = px.bar(tmp, x="assignment_group", y="tiempo_resolucion_horas",
+                          title="Tiempo promedio por grupo (Top 20)")
+        else:
+            fig2 = px.bar(title="Tiempo promedio por grupo (n/d)")
 
-@app.callback(
-    Output("p-out","children"),
-    Input("p-btn","n_clicks"),
-    State("p-impact","value"),
-    State("p-urgency","value"),
-    State("p-priority","value"),
-    State("p-reassign","value"),
-    State("p-reopen","value")
-)
-def predecir(n, imp, urg, pri, reas, reop):
-    if not n:
-        return ""
-    if baseline_model is None or len(feat_cols)==0:
-        return "Modelo no disponible. Ejecuta el pipeline (o conecta el .pkl del equipo)."
+        if {"reassignment_count","tiempo_resolucion_horas"}.issubset(dff.columns):
+            # Si no tienes statsmodels instalado, quita trendline="ols"
+            fig3 = px.scatter(dff, x="reassignment_count", y="tiempo_resolucion_horas",
+                              title="Reasignaciones vs Tiempo de resolución", trendline="ols")
+        else:
+            fig3 = px.scatter(title="Reasignaciones vs Tiempo (n/d)")
 
-    row = {
-        "impact_n": imp or 2,
-        "urgency_n": urg or 2,
-        "priority_n": pri or 2,
-        "reassignment_count": reas or 0,
-        "reopen_count": reop or 0,
-        "opened_hour": 12 if "opened_hour" in feat_cols else 12,
-        "opened_wday": 2 if "opened_wday" in feat_cols else 2,
-        "opened_month": 6 if "opened_month" in feat_cols else 6,
-    }
-    Xnew = pd.DataFrame([row])[feat_cols].fillna(0)
-    pred = baseline_model.predict(Xnew)[0]
-    return f"⏱️ Tiempo estimado de resolución: {pred:.2f} horas"
+        return kpi_mttr, kpi_sla, kpi_vol, kpi_crit, fig1, fig2, fig3
+
+    except Exception as e:
+        print(">> Error en callback:", e)
+        empty = px.scatter(title="(sin datos)")
+        return "n/d","n/d","n/d","n/d", empty, empty, empty
 
 if __name__ == "__main__":
     print(">> Levantando servidor Dash en http://127.0.0.1:8050 ...")
-    app.run(debug=True, host="127.0.0.1", port=8050)
-
-
+    app.run(host="127.0.0.1", port=8050, debug=True)
