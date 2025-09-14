@@ -1,8 +1,13 @@
 import pandas as pd
 import numpy as np
 
+<<<<<<< HEAD
 #Carga de datos
 df = pd.read_csv('incident_event_log.csv')
+=======
+# --- Configuración ---
+df = pd.read_csv('../incident_event_log.csv', low_memory=False)
+>>>>>>> 284e8aec98f5df77bee36149cf45bb6c9ef18415
 print (df.head())
 
 # 1) Normalizar strings (recortar) en columnas object
@@ -71,6 +76,7 @@ for c in bool_cols:
 num_cols = df_closed.select_dtypes(include=[np.number]).columns.tolist()
 df_closed[num_cols] = df_closed[num_cols].fillna(0)
 
+<<<<<<< HEAD
 # 8) Eliminar columnas constantes (sin información)
 const_cols = []
 for c in df_closed.columns:
@@ -79,6 +85,17 @@ for c in df_closed.columns:
         const_cols.append(c)
 if len(const_cols) > 0:
     df_closed = df_closed.drop(columns=const_cols, errors="ignore")
+=======
+import os
+os.makedirs("tarea5/data", exist_ok=True)
+
+df_interes.to_csv("tarea5/data/incidentes_limpio.csv", index=False)
+
+print("OK -> tarea5/data/incidentes_limpio.csv")
+
+
+
+>>>>>>> 284e8aec98f5df77bee36149cf45bb6c9ef18415
 
 print(df_closed)
 print(df)
