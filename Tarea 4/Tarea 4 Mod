@@ -21,13 +21,13 @@ df["resolved_at"] = pd.to_datetime(df["resolved_at"], errors="coerce", dayfirst=
 df["tiempo_resolver_horas"] = (df["resolved_at"] - df["opened_at"]).dt.total_seconds() / 3600
 
 #variables explicativas
-cat_features = ["priority", "impact"]                
-num_features = ["reassignment_count", "reopen_count"]  
-features = cat_features + num_features
+cat_var = ["priority", "impact"]                
+num_var = ["reassignment_count", "reopen_count"]  
+variables = cat_var + num_var
 
 
-df_model = df[features + ["tiempo_resolver_horas"]].dropna()
-X = df_model[features]
+df_model = df[variables + ["tiempo_resolver_horas"]].dropna()
+X = df_model[variables]
 y = df_model["tiempo_resolver_horas"]
 
 
@@ -36,8 +36,8 @@ cat_transformer = Pipeline(steps=[
     ("onehot", OneHotEncoder(handle_unknown="ignore"))   # si prefieres: OneHotEncoder(handle_unknown='ignore', drop='first')
 ])
 preprocessor = ColumnTransformer(transformers=[
-    ("cat", cat_transformer, cat_features),
-    ("num", "passthrough", num_features)
+    ("cat", cat_transformer, cat_var),
+    ("num", "passthrough", num_var)
 ])
 
 # Pipeline con Regresión Lineal
@@ -70,19 +70,19 @@ ohe = pre.named_transformers_["cat"].named_steps["onehot"]
 
 # Obtener nombres de categorías (robust: try get_feature_names_out, fallback a get_feature_names)
 try:
-    cat_names = ohe.get_feature_names_out(cat_features)   # sklearn >= 1.0
+    cat_names = ohe.get_feature_names_out(cat_var)   # sklearn >= 1.0
 except AttributeError:
     # algunos sklearn antiguos usan get_feature_names()
-    cat_names = ohe.get_feature_names(cat_features)
+    cat_names = ohe.get_feature_names(cat_var)
 
 
-feature_names = list(cat_names) + list(num_features)
+var_names = list(cat_names) + list(num_var)
 
 # Extraer los coeficientes de la regresion
 coefs = reg_pipeline.named_steps["regressor"].coef_
 intercept = reg_pipeline.named_steps["regressor"].intercept_
 
-coef_df = pd.DataFrame({"feature": feature_names, "coef": coefs})
+coef_df = pd.DataFrame({"variable": var_names, "coef": coefs})
 coef_df = coef_df.sort_values(by="coef", ascending=False).reset_index(drop=True)
 
 print("\nIntercepto (β0):", intercept)
