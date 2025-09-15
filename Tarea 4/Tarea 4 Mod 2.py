@@ -5,16 +5,21 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
-df = pd.read_csv("incident_event_log.csv")
 
+import Tarea3  
+from Tarea3 import df_closed
+df=Tarea3.df_closed
 
 df["opened_at"]  = pd.to_datetime(df["opened_at"], errors="coerce", dayfirst=True)
 df["resolved_at"] = pd.to_datetime(df["resolved_at"], errors="coerce", dayfirst=True)
 df["tiempo_resolver_horas"] = (df["resolved_at"] - df["opened_at"]).dt.total_seconds() / 3600
 
 
-df["made_sla_num"] = df["made_sla"].apply(lambda x: 1 if str(x).lower() == "true" else 0)
-df["knowledge_num"] = df["knowledge"].apply(lambda x: 1 if str(x).lower() == "true" else 0)
+
+df["made_sla_num"] = df["made_sla"].astype(str).str.lower().eq("true").astype(int)
+df["knowledge_num"] = df["knowledge"].astype(str).str.lower().eq("true").astype(int)
+
+
 
 
 df["contact_type_num"] = df["contact_type"].astype("category").cat.codes
