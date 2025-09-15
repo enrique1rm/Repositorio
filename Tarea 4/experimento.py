@@ -1,3 +1,4 @@
+# Tarea4.py
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -49,5 +50,3 @@ coef_df = pd.DataFrame({
 print("\nIntercepto (β0):", reg.intercept_)
 print("\nCoeficientes:")
 print(coef_df.to_string(index=False))
-
- 
