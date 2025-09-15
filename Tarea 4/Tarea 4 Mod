@@ -1,8 +1,8 @@
 import pandas as pd
 import Tarea3
 
-from Tarea3 import load_data
-df = load_data()
+from Tarea3 import df_closed
+df = Tarea3.df_closed
 
 
 import pandas as pd
@@ -15,23 +15,22 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 
-# 1) Cargar y crear target
 df = pd.read_csv("incident_event_log.csv")
 df["opened_at"]  = pd.to_datetime(df["opened_at"], errors="coerce", dayfirst=True)
 df["resolved_at"] = pd.to_datetime(df["resolved_at"], errors="coerce", dayfirst=True)
 df["tiempo_resolver_horas"] = (df["resolved_at"] - df["opened_at"]).dt.total_seconds() / 3600
 
-# 2) Features elegidas
-cat_features = ["priority", "impact"]                # categóricas
-num_features = ["reassignment_count", "reopen_count"]  # numéricas
+#variables explicativas
+cat_features = ["priority", "impact"]                
+num_features = ["reassignment_count", "reopen_count"]  
 features = cat_features + num_features
 
-# 3) Filtrar filas con datos faltantes en las columnas que usaremos
+
 df_model = df[features + ["tiempo_resolver_horas"]].dropna()
 X = df_model[features]
 y = df_model["tiempo_resolver_horas"]
 
-# 4) Preprocesador
+
 cat_transformer = Pipeline(steps=[
     ("imputer", SimpleImputer(strategy="constant", fill_value="missing")),
     ("onehot", OneHotEncoder(handle_unknown="ignore"))   # si prefieres: OneHotEncoder(handle_unknown='ignore', drop='first')
@@ -41,19 +40,19 @@ preprocessor = ColumnTransformer(transformers=[
     ("num", "passthrough", num_features)
 ])
 
-# 5) Pipeline con Regresión Lineal
+# Pipeline con Regresión Lineal
 reg_pipeline = Pipeline(steps=[
     ("preprocessor", preprocessor),
     ("regressor", LinearRegression())
 ])
 
-# 6) Split
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, random_state=42)
 
-# 7) Entrenar
+# Entrenar
 reg_pipeline.fit(X_train, y_train)
 
-# 8) Predecir y evaluar (RMSE calculado sin 'squared' param)
+#  Predecir y evaluar (RMSE calculado sin 'squared' param)
 y_pred = reg_pipeline.predict(X_test)
 rmse = np.sqrt(mean_squared_error(y_test, y_pred))    # <- aquí el cambio
 mae  = mean_absolute_error(y_test, y_pred)
@@ -63,10 +62,9 @@ print("RMSE:", rmse)
 print("MAE :", mae)
 print("R2  :", r2)
 
-# -------------------------
-# 9) Extraer coeficientes y nombres de features
-# -------------------------
-# Obtener el encoder desde el preprocessor
+
+#  Extraer coeficientes y variables explicativas
+
 pre = reg_pipeline.named_steps["preprocessor"]
 ohe = pre.named_transformers_["cat"].named_steps["onehot"]
 
@@ -77,7 +75,7 @@ except AttributeError:
     # algunos sklearn antiguos usan get_feature_names()
     cat_names = ohe.get_feature_names(cat_features)
 
-# Los nombres de features en orden: primero las columnas generadas por OHE, luego las numéricas (passthrough)
+
 feature_names = list(cat_names) + list(num_features)
 
 # Extraer coeficientes del regresor
