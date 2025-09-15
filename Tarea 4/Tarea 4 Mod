@@ -78,7 +78,7 @@ except AttributeError:
 
 feature_names = list(cat_names) + list(num_features)
 
-# Extraer coeficientes del regresor
+# Extraer los coeficientes de la regresion
 coefs = reg_pipeline.named_steps["regressor"].coef_
 intercept = reg_pipeline.named_steps["regressor"].intercept_
 
